@@ -1,0 +1,7 @@
+ollama
+json
+requests
+typing
+dataclasses 
+time
+re
