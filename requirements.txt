@@ -5,3 +5,7 @@ typing
 dataclasses 
 time
 re
+numpy
+pandas 
+sklearn.decomposition
+sklearn.preprocessing
