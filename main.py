@@ -17,6 +17,7 @@ prompts = [
 4. 避免雙重否定和模糊語言，確保題目清晰易懂。
 """, 
 """
+# Theoretical Background:
 AI use anxiety is a growing concern among workers as artificial intelligence becomes more prevalent in the workplace. Many employees feel intimidated or apprehensive about using AI tools in their daily work tasks. Here are some key points about AI use anxiety:
 ## Prevalence of AI Anxiety
 Recent surveys indicate that AI anxiety is widespread:
@@ -45,12 +46,14 @@ Employers can take several steps to ease anxiety and support employees:
 - Offer mental health resources to help employees cope with anxiety
 
 By addressing AI use anxiety proactively, organizations can help employees feel more comfortable and confident in leveraging AI technologies effectively in their work. This is crucial for successful AI adoption and maintaining a positive workplace culture.
+
+# Task:
+Please design a psychological scale called the "AI Use Anxiety Scale" to assess employees' anxiety related to using AI tools at work.
+
 """
 ]
 
-specifications = prompts[1]
-
-def run_LM_AIG_workflow():
+def run_LM_AIG_workflow(specifications: str = prompts[0], max_iterations: int = 3, num_items: int = 10):
     # 建立完整系統
     lm_aig_system = LM_AIG_System()
     print("✅ LM-AIG 完整系統已初始化！")
@@ -77,21 +80,45 @@ def run_LM_AIG_workflow():
         print(f"  第 {iteration['iteration']} 次迭代: {score}/10")
 
     # 將結果儲存為文字檔
-    with open(f"lm_aig_workflow_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", "w", encoding="utf-8") as f:
+    filename = f"lm_aig_workflow_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("LM-AIG 工作流程結果\n")
         f.write("="*40 + "\n\n")
         f.write("最終題目列表:\n")
-        for idx, item in enumerate(results["final_items"], 1):
-            f.write(f"{idx}. {item}\n")
+        
+        # 根據構念分類題目
+        constructs_and_items = []
+        for item in results.get("final_items", []):
+            construct = item.get("psychological_construct", "未分類")
+            # 檢查是否已存在該構念，若無則新增
+            if construct not in constructs_and_items:
+                constructs_and_items.append({f"{construct}": []})
+
+            # 將題目加入對應構念
+            for construct_dict in constructs_and_items:
+                if construct in construct_dict:
+                    construct_dict[construct].append(item["item"])
+
+        for construct_dict in constructs_and_items:
+            for construct, items in construct_dict.items():
+                f.write(f"\n構念: {construct}\n")
+                for idx, item in enumerate(items, 1):
+                    f.write(f"  {idx}. {item}\n")
+
         f.write("\n各迭代評分:\n")
         for iteration in results["iterations"]:
             score = iteration.get("overall_score", 0)
             f.write(f"第 {iteration['iteration']} 次迭代: {score}/10\n")
-    print(f"\n✅ 結果已儲存至 lm_aig_workflow_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+    print(f"\n✅ 結果已儲存至 {filename}")
 
 def run_data_analysis_workflow():
     pass
 
 if __name__ == "__main__":
-    run_LM_AIG_workflow()
-    # run_data_analysis_workflow()
+    specifications = prompts[1]
+    max_iterations = 5
+    num_items = 20
+    run_LM_AIG_workflow(
+        specifications=specifications, 
+        max_iterations=max_iterations, 
+        num_items=num_items)

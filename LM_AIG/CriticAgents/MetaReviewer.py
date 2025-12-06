@@ -37,7 +37,6 @@ class MetaReviewer:
     - recommendations: List of recommendations for improvement
     - regenerate_recommended: Whether regeneration is recommended (boolean)
     """
-
         return self._get_review_response(prompt)
 
     def _get_review_response(self, prompt: str) -> Dict[str, Any]:
