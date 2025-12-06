@@ -60,7 +60,7 @@ class LM_AIG_System:
                 print("🔧 根據評審建議改進題目...")
                 feedback = previous_review.get("recommendations", "請改進題目品質")
                 generation_result = self.item_writer.refine_items(
-                    current_items, str(feedback))
+                    current_items, str(feedback), specifications, num_items)
 
             if "error" in generation_result:
                 print(f"❌ 生成錯誤: {generation_result['error']}")
@@ -70,7 +70,7 @@ class LM_AIG_System:
             print(f"✅ 已生成 {len(current_items)} 個題目")
             print(f"題目內容:")
             for i, item in enumerate(current_items, 1):
-                print(f"{i:2}. {item['item'] if isinstance(item, dict) else item}")
+                print(f"{i:2}. {item.get('item') if isinstance(item, dict) else item}")
 
             # 評審題目
             print("🔍 評審題目品質...")
@@ -100,6 +100,8 @@ class LM_AIG_System:
             if len(current_items) < num_items:
                 print(f"❌ 題目數量不足 (需要 {num_items}，但只有 {len(current_items)})，繼續改進")
                 previous_review = review_result.get("meta_review", {})
+
+                previous_review = previous_review + f"\n\n 此外，請增加題目數量至至少 {num_items} 個。"
                 continue
             elif review_result.get("overall_score", 0) >= 7:  # 7分以上算及格
                 print("✅ 題目品質已達標準，結束迭代")
@@ -112,6 +114,7 @@ class LM_AIG_System:
                 previous_review = review_result.get("meta_review", {})
 
         workflow_results["final_items"] = current_items
+        return workflow_results
 
     def display_results(self, results: Dict[str, Any]):
         """顯示工作流程結果"""

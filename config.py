@@ -9,6 +9,7 @@ class Config:
     model_name: str = "qwen3:8b"  # 使用較小的模型
     temperature: float = 0.7
     max_tokens: int = 1000
+    language: str = "繁體中文"
 
 config = Config()
 

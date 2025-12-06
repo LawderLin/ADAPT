@@ -3,32 +3,35 @@ import ollama
 import json
 import re
 from typing import List, Dict, Any
+from LM_AIG.JSONFormatAgent import JSONFormatAgent
 
 class ItemWritingAgent():
     """
     基於 Ollama 的題目生成代理人，根據使用者規格使用指定語言模型生成測驗題目。
     """
 
-    def __init__(self, model: str = None, system_prompt: str = None):
+    def __init__(self, model: str = None, system_prompt: str = None,):
         self.model = model or config.model_name
         self.system_prompt = system_prompt or self._default_system_prompt()
+        self.language = config.language
+        self.json_agent = JSONFormatAgent()
 
     def _default_system_prompt(self) -> str:
         """預設的系統提示詞"""
-        return """你是一個專業的心理測驗題目編寫專家。請根據使用者的需求，生成高品質的測驗題目。
+        return """You are a professional expert in writing psychological test items. Please generate high-quality test items according to the user's requirements.
 
-生成規則：
-1. 每個題目都應該有明確的心理學理論基礎
-2. 題目語言應該清晰、無歧義
-3. 避免文化偏見和人口學偏見
-4. 題目難度應該適中
-5. 提供多個選項
+        Generation rules:
+        1. Each item should have a clear psychological theory basis.
+        2. The language of the items should be clear and unambiguous.
+        3. Avoid cultural and demographic biases.
+        4. The difficulty of the items should be moderate.
+        5. Provide multiple options for each item.
 
-輸出格式：
-請以 JSON 格式輸出，包含以下欄位：
-- item: 題目內容
-- psychological_construct: 心理建構
-"""
+        Output format:
+        Please output in JSON format, including the following fields:
+        - item: The content of the test item
+        - psychological_construct: The psychological construct
+        """
 
     def generate_items(self, specifications: str, num_items: int = 5) -> Dict[str, Any]:
         """
@@ -44,11 +47,13 @@ class ItemWritingAgent():
         try:
             # 構建完整的提示詞
             user_prompt = f"""
-規格要求：
-{specifications}
+            Specifications for the psychological test items:
+            {specifications}
 
-請根據以上規格生成 {num_items} 個心理測驗題目，嚴格按照 JSON 格式輸出結果。
-"""
+            Please generate {num_items} psychological test items based on the above specifications, strictly outputting the results in JSON format.
+
+            The items should be written in {self.language}
+            """
 
             # 調用 Ollama API
             response = ollama.chat(
@@ -67,7 +72,7 @@ class ItemWritingAgent():
             # 解析回應
             content = response['message']['content']
 
-            result = self.process_json_response(content)
+            result = self.json_agent.format_to_json(content)
 
             return result
 
@@ -77,7 +82,7 @@ class ItemWritingAgent():
                 "items": []
             }
 
-    def refine_items(self, items: List[str], feedback: str) -> Dict[str, Any]:
+    def refine_items(self, items: List[str], feedback: str, specifications: str, num_items: int = 5) -> Dict[str, Any]:
         """
         根據回饋改進題目
 
@@ -90,17 +95,20 @@ class ItemWritingAgent():
         """
         try:
             refine_prompt = f"""
-請根據以下回饋改進這些心理測驗題目：
+Refine the following psychological test items based on the feedback provided.
 
-原始要求：
+Specifications for the psychological test items:
+{specifications}
 
-原始題目：
+Number of items: Please generate at least {num_items} items.
+
+Original Items:
 {json.dumps(items, ensure_ascii=False, indent=2)}
 
-改進建議：
+Feedback:
 {feedback}
 
-請輸出改進後的題目（JSON 格式）。
+Please output the refined items in JSON format.
 """
 
             response = ollama.chat(
@@ -116,42 +124,13 @@ class ItemWritingAgent():
             )
 
             content = response['message']['content']
-
-            result = self.process_json_response(content)
-
-            return result
+            return self.json_agent.format_to_json(content)
 
         except Exception as e:
             return {
                 "error": f"改進題目時發生錯誤: {str(e)}",
                 "items": items
             }
-
-    def process_json_response(self, content: str) -> Dict[str, Any]:
-        """
-        處理模型回應的 JSON 格式
-
-        Args:
-            content: 模型回應內容
-
-        Returns:
-            解析後的 JSON 資料
-        """
-        try:
-            # 先去除 markdown 格式
-            content = re.sub(r"^```json|^```|```$", "",
-                             content, flags=re.MULTILINE).strip()
-            json_match = re.search(r'\{.*\}', content, re.DOTALL).group()
-            if json_match:
-                content = json.loads(f"[{json_match}]")
-                # content = json.loads(json_match)
-                result = {"raw_output": content, "items": content}
-            else:
-                result = {"raw_output": content, "items": content}
-        except json.JSONDecodeError:
-            result = {"raw_output": content, "items": content}
-
-        return result
 
 
 # 建立題目生成器實例
