@@ -13,23 +13,23 @@ class ContentReviewer:
     def review(self, items: List[str], construct: str) -> Dict[str, Any]:
         """評估內容效度"""
         prompt = f"""
-你是心理測驗內容效度專家。請評估以下題目是否能有效測量指定的心理建構。
+    You are an expert in psychological test content validity. Please evaluate whether the following items effectively measure the specified psychological construct.
 
-心理建構: {construct}
-題目列表:
-{json.dumps(items, ensure_ascii=False, indent=2)}
+    Psychological construct: {construct}
+    Item list:
+    {json.dumps(items, ensure_ascii=False, indent=2)}
 
-請評估：
-1. 題目是否與心理建構相關
-2. 題目是否涵蓋該建構的重要面向
-3. 題目的理論基礎是否充分
+    Please assess:
+    1. Whether the items are relevant to the psychological construct
+    2. Whether the items cover important aspects of the construct
+    3. Whether the items have sufficient theoretical foundation
 
-請以 JSON 格式輸出評估結果，包含：
-- validity_score: 效度分數 (1-10)
-- strengths: 優點列表
-- weaknesses: 缺點列表
-- suggestions: 改進建議
-"""
+    Please output your evaluation in JSON format, including:
+    - validity_score: Validity score (1-10)
+    - strengths: List of strengths
+    - weaknesses: List of weaknesses
+    - suggestions: Suggestions for improvement
+    """
 
         return self._get_review_response(prompt)
 

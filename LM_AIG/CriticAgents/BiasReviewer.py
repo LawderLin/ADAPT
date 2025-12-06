@@ -11,24 +11,23 @@ class BiasReviewer:
 
     def review(self, items: List[str]) -> Dict[str, Any]:
         """檢查人口學偏見"""
-        prompt = f"""
-你是測驗偏見檢查專家。請檢查以下測驗題目是否存在人口學偏見。
+        prompt = f"""You are an expert in psychological test development. Please review the following test items for potential demographic biases.
 
-題目列表:
+Items:
 {json.dumps(items, ensure_ascii=False, indent=2)}
 
-請檢查是否存在以下偏見：
-1. 性別偏見
-2. 年齡偏見  
-3. 文化偏見
-4. 社經地位偏見
-5. 其他歧視性內容
+Please check for the following biases:
+1. Gender bias
+2. Age bias
+3. Cultural bias
+4. Social economic status bias
+5. Other discriminatory content
 
-請以 JSON 格式輸出檢查結果，包含：
-- bias_score: 偏見程度 (1-10, 10表示無偏見)
-- detected_biases: 發現的偏見類型列表
-- problematic_items: 有問題的題目
-- suggestions: 消除偏見的建議
+Please provide the review results in JSON format, including:
+- bias_score: Degree of bias (1-10, with 10 indicating no bias)
+- detected_biases: List of detected bias types
+- problematic_items: List of items with potential biases
+- suggestions: Suggestions for eliminating biases
 """
 
         return self._get_review_response(prompt)

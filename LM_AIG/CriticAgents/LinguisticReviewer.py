@@ -12,23 +12,23 @@ class LinguisticReviewer:
     def review(self, items: List[str]) -> Dict[str, Any]:
         """評估題目的語言品質"""
         prompt = f"""
-你是語言學專家。請評估以下測驗題目的語言品質。
+    You are a linguistics expert. Please evaluate the language quality of the following test items.
 
-題目列表:
-{json.dumps(items, ensure_ascii=False, indent=2)}
+    Item list:
+    {json.dumps(items, ensure_ascii=False, indent=2)}
 
-請評估：
-1. 語言是否清晰易懂
-2. 是否有語法錯誤
-3. 用詞是否恰當
-4. 是否有歧義表達
+    Please assess:
+    1. Is the language clear and easy to understand?
+    2. Are there any grammatical errors?
+    3. Is the wording appropriate?
+    4. Are there any ambiguous expressions?
 
-請以 JSON 格式輸出評估結果，包含：
-- readability_score: 可讀性分數 (1-10)
-- grammar_issues: 語法問題列表
-- clarity_issues: 清晰度問題列表
-- suggestions: 語言改進建議
-"""
+    Please output the evaluation results in JSON format, including:
+    - readability_score: readability score (1-10)
+    - grammar_issues: list of grammar issues
+    - clarity_issues: list of clarity issues
+    - suggestions: suggestions for language improvement
+    """
 
         return self._get_review_response(prompt)
 

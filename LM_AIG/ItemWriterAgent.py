@@ -25,7 +25,7 @@ class ItemWritingAgent():
         2. The language of the items should be clear and unambiguous.
         3. Avoid cultural and demographic biases.
         4. The difficulty of the items should be moderate.
-        5. Provide multiple options for each item.
+        5. The items should be Likert-scale questions.
 
         Output format:
         Please output in JSON format, including the following fields:
@@ -100,13 +100,14 @@ Refine the following psychological test items based on the feedback provided.
 Specifications for the psychological test items:
 {specifications}
 
-Number of items: Please generate at least {num_items} items.
-
 Original Items:
 {json.dumps(items, ensure_ascii=False, indent=2)}
 
 Feedback:
 {feedback}
+
+Number of items: Please generate at least {num_items} items.
+The items should be written in {self.language}
 
 Please output the refined items in JSON format.
 """
