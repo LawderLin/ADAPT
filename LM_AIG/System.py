@@ -1,9 +1,10 @@
-from config import config
-import json
+import datetime
 from typing import Dict, Any
 
 from LM_AIG.ItemWriterAgent import ItemWritingAgent
 from LM_AIG.CriticAgent import CriticAgent
+from LM_AIG.ConstructSettingAgent import ConstructSettingAgent
+
 
 class LM_AIG_System:
     """
@@ -13,6 +14,7 @@ class LM_AIG_System:
     def __init__(self):
         self.item_writer = ItemWritingAgent()
         self.critic = CriticAgent()
+        self.construct_agent = ConstructSettingAgent()
 
     def run_complete_workflow(self, specifications: str, num_items: int = 5,
                               max_iterations: int = 3) -> Dict[str, Any]:
@@ -40,22 +42,28 @@ class LM_AIG_System:
         }
 
         print(f"🚀 開始 LM-AIG 工作流程")
-        print(f"📝 規格: {specifications}")
         print(f"🔢 目標題目數量: {num_items}")
         print("-" * 50)
 
         current_items = None
         previous_review = {}
         review_result = {}
-        
+
+        # 產生心理構念
+        print("🧠 產生心理構念定義...")
+        construct_definition = self.construct_agent.draft_construct_definition(
+            specifications)
+        print(f"心理構念定義：\n{construct_definition}\n")
+
         for iteration in range(max_iterations):
-            print(f"\n🔄 第 {iteration + 1} 次迭代")
+            print("="*40)
+            print(f"🔄 第 {iteration + 1} 次迭代")
 
             # 第一次迭代：生成題目；後續迭代：改進題目
             if iteration == 0:
                 print("📝 生成初始題目...")
                 generation_result = self.item_writer.generate_items(
-                    specifications, num_items)
+                    specifications, num_items, construct_definition)
             else:
                 print("🔧 根據評審建議改進題目...")
                 feedback = previous_review.get("recommendations", "請改進題目品質")
@@ -64,18 +72,26 @@ class LM_AIG_System:
 
             if "error" in generation_result:
                 print(f"❌ 生成錯誤: {generation_result['error']}")
+                print(f"重新嘗試第 {iteration + 1} 次迭代...")
+                iterartion -= 1 # 減少一次迭代計數，重新嘗試
                 continue
 
-            current_items = generation_result.get("items", [])
+            current_items = generation_result
+            
             print(f"✅ 已生成 {len(current_items)} 個題目")
             print(f"題目內容:")
             for i, item in enumerate(current_items, 1):
-                print(f"{i:2}. {item.get('item') if isinstance(item, dict) else item}")
+                print(
+                    f"{i:2}. {item.get('item') if isinstance(item, dict) else item}")
 
+            print("-"*40)
             # 評審題目
             print("🔍 評審題目品質...")
-            review_result = self.critic.review_items(current_items,
-                                                     specifications)
+            review_result = self.critic.review_items(
+                items=current_items,
+                specification=specifications,
+                construct=construct_definition
+            )
 
             iteration_result = {
                 "iteration": iteration + 1,
@@ -86,24 +102,37 @@ class LM_AIG_System:
             }
 
             # 顯示 reveiw result
-            print(f"""🔍 評審結果: 
-                  內容效度評估：{review_result.get("individual_reviews").get("content_review")}
-                    語言學評估：{review_result.get("individual_reviews").get("linguistic_review")}
-                    偏見檢查評估：{review_result.get("individual_reviews").get("bias_review")}
-                    元評審結果：{review_result.get("meta_review")}""")
-
+            individual_reviews: dict = review_result.get("individual_reviews", {})
+            print("🔍 評審結果: ")
+            
+            print("-"*40)
+            print(f"內容效度評估：{individual_reviews.get("content_review", {}).get("validity_score", "無回傳評分")}")
+            for idx, suggestion in enumerate(individual_reviews.get("content_review", {}).get("suggestions", []), 1):
+                print(f"  建議 {idx}: {suggestion}")
+            print("-"*40)
+            print(f"語言學評估：{individual_reviews.get("linguistic_review", {}).get("linguistic_score", "無回傳評分")}")
+            for idx, suggestion in enumerate(individual_reviews.get("linguistic_review", {}).get("suggestions", []), 1):
+                print(f"  建議 {idx}: {suggestion}")
+            print("-"*40)
+            print(f"偏見檢查評估：{individual_reviews.get("bias_review", {}).get("bias_score", "無回傳評分")}")
+            for idx, suggestion in enumerate(individual_reviews.get("bias_review", {}).get("suggestions", []), 1):
+                print(f"  建議 {idx}: {suggestion}")
+            print("-"*40)
+            print(f"元評審結果：{review_result.get("meta_review").get("overall_score", "無回傳評分")}")
+            for idx, recommendation in enumerate(review_result.get("meta_review").get("recommendations", []), 1):
+                print(f"  建議 {idx}: {recommendation}")
+            
+            print("-"*40)
             workflow_results["iterations"].append(iteration_result)
 
             print(f"📊 綜合評分: {review_result.get('overall_score', 0)}/10")
 
-            # 先檢查題目數，再檢查是否達到滿意標準
             if len(current_items) < num_items:
-                print(f"❌ 題目數量不足 (需要 {num_items}，但只有 {len(current_items)})，繼續改進")
-                previous_review = review_result.get("meta_review", {})
-
-                previous_review = previous_review + f"\n\n 此外，請增加題目數量至至少 {num_items} 個。"
-                continue
-            elif review_result.get("overall_score", 0) >= 7:  # 7分以上算及格
+                print(
+                    f"⚠️ 生成的題目數量不足（{len(current_items)}/{num_items}），將重新生成題目。")
+                previous_review=review_result.get("meta_review", {})
+                previous_review["recommendations"].append(f"Currently only have generated {len(current_items)} items, please generate {num_items} items.")
+            elif review_result.get("overall_score", 0) >= 8:  # 8分以上算及格
                 print("✅ 題目品質已達標準，結束迭代")
                 break
             elif not review_result.get("meta_review", {}).get("regenerate_recommended", True):
@@ -111,37 +140,57 @@ class LM_AIG_System:
                 break
             else:
                 print("⚠️ 需要繼續改進")
-                previous_review = review_result.get("meta_review", {})
+                previous_review=review_result.get("meta_review", {})
 
-        workflow_results["final_items"] = current_items
+        workflow_results["final_items"]=current_items
+
+        self.display_results(workflow_results, specifications)
+
         return workflow_results
 
-    def display_results(self, results: Dict[str, Any]):
+    def display_results(self, results: Dict[str, Any], specifications: str):
         """顯示工作流程結果"""
-        print("\n" + "="*60)
-        print("📋 LM-AIG 系統執行結果")
-        print("="*60)
+        # 顯示最終結果
+        print("\n" + "="*40)
+        print("🚀 LM-AIG 工作流程完成！")
+        print("="*40)
 
-        print(f"\n📝 原始規格: {results['original_specifications']}")
-        print(f"🔄 迭代次數: {len(results['iterations'])}")
+        print("\n📝 最終題目列表:")
+        for idx, item in enumerate(results.get("final_items", []), 1):
+            print(f"  {idx}. {item['item']} (Construct: {item['psychological_construct']})")
 
-        # 顯示最終題目
-        final_items = results.get("final_items", [])
-
-        # 如果是字串 JSON 格式，先解析為列表
-        if isinstance(final_items, str):
-            try:
-                final_items = json.loads(final_items)
-            except json.JSONDecodeError:
-                final_items = [final_items]
-
-        if final_items:
-            print(f"\n📊 最終題目 ({len(final_items)} 個):")
-        for i, item in enumerate(final_items, 1):
-            print(f"{i:2}. {item}")
-
-        # 顯示評審歷程
-        print(f"\n📈 評分歷程:")
-        for iteration in results["iterations"]:
+        print("\n🔄 各迭代評分:")
+        for iteration in results.get("iterations", []):
             score = iteration.get("overall_score", 0)
             print(f"  第 {iteration['iteration']} 次迭代: {score}/10")
+
+        # 將結果儲存為文字檔
+        filename = f"lm_aig_workflow_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write("LM-AIG 工作流程結果\n")
+            f.write("="*40 + "\n\n")
+            f.write("題目生成日期: " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n\n")
+            f.write(f"使用者輸入規格:\n{specifications}\n\n")
+            f.write("題目列表:\n")
+            
+            # 根據構念分類題目
+            constructs = []  # A list of constructs
+            items_by_construct = {} # A dictionary to hold items by construct
+            for item in results.get("final_items", []):
+                construct = item.get("psychological_construct", "未分類")
+                if construct not in constructs:
+                    constructs.append(construct)
+                    items_by_construct[construct] = []
+                items_by_construct[construct].append(item.get("item", ""))
+
+            for construct in constructs:
+                f.write(f"\n構念: {construct}\n")
+                for idx, item in enumerate(items_by_construct[construct], 1):
+                    f.write(f"  {idx}. {item}\n")
+
+            f.write("\n各迭代評分:\n")
+            for iteration in results["iterations"]:
+                score = iteration.get("overall_score", 0)
+                f.write(f"第 {iteration['iteration']} 次迭代: {score}/10\n")
+
+        print(f"\n✅ 結果已儲存至 {filename}")

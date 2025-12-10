@@ -1,7 +1,7 @@
 from config import config
 import ollama
 import json
-import re
+from pydantic import BaseModel
 from typing import List, Dict, Any
 from LM_AIG.JSONFormatAgent import JSONFormatAgent
 
@@ -14,6 +14,7 @@ class ItemWritingAgent():
         self.model = model or config.model_name
         self.system_prompt = system_prompt or self._default_system_prompt()
         self.language = config.language
+        self.schema = self._define_schema()
         self.json_agent = JSONFormatAgent()
 
     def _default_system_prompt(self) -> str:
@@ -32,8 +33,16 @@ class ItemWritingAgent():
         - item: The content of the test item
         - psychological_construct: The psychological construct
         """
+    
+    def _define_schema(self) -> BaseModel:
+        """定義輸出 JSON 結構"""
+        class ItemSchema(BaseModel):
+            item: str
+            psychological_construct: str
 
-    def generate_items(self, specifications: str, num_items: int = 5) -> Dict[str, Any]:
+        return ItemSchema
+
+    def generate_items(self, specifications: str, num_items: int = 5, construct_definitions: str = "") -> List[Dict[str, Any]]:
         """
         根據規格生成測驗題目
 
@@ -52,8 +61,12 @@ class ItemWritingAgent():
 
             Please generate {num_items} psychological test items based on the above specifications, strictly outputting the results in JSON format.
 
-            The items should be written in {self.language}
+            - The items should be written in {self.language}
+            - Please generate at least {num_items} items.
             """
+
+            if construct_definitions != "":
+                user_prompt += f"\n\nPsychological construct definitions:\n{construct_definitions}\n"
 
             # 調用 Ollama API
             response = ollama.chat(
@@ -66,7 +79,7 @@ class ItemWritingAgent():
                     "temperature": config.temperature,
                     "num_predict": config.max_tokens
                 },
-                # format="json"
+                format=self.schema.model_json_schema()
             )
 
             # 解析回應
@@ -74,13 +87,30 @@ class ItemWritingAgent():
 
             result = self.json_agent.format_to_json(content)
 
+            try:
+                item = result[0]['item']
+            except KeyError:
+                print("❌ 無法從回應中提取題目，正在重新嘗試生成題目...")
+                return self.generate_items(specifications, num_items, construct_definitions)
+
             return result
 
         except Exception as e:
-            return {
-                "error": f"生成題目時發生錯誤: {str(e)}",
-                "items": []
-            }
+            # 若是無法找到 JSON 的錯誤，直接重新嘗試生成
+            retry = [
+                "\'NoneType\' object has no attribute \'group\'",
+                "修正資料 JSON 格式時發生錯誤: Expecting value: line 1 column 1 (char 0)"
+            ]
+            if str(e) in retry:
+                print("❌ 未能生成有效的 JSON，正在重新嘗試生成題目...")
+                return self.generate_items(specifications, num_items, construct_definitions)
+            else:
+                print(f"❌ 生成題目時發生錯誤: {str(e)}")
+                exit(1)
+                # return {
+                #     "error": f"生成題目時發生錯誤: {str(e)}",
+                #     "items": []
+                # }
 
     def refine_items(self, items: List[str], feedback: str, specifications: str, num_items: int = 5) -> Dict[str, Any]:
         """
@@ -101,17 +131,17 @@ Specifications for the psychological test items:
 {specifications}
 
 Original Items:
-{json.dumps(items, ensure_ascii=False, indent=2)}
+{'\n'.join([f"- {item['item']} ({item['psychological_construct']})" for item in items])}
 
 Feedback:
-{feedback}
+{'\n'.join([f"- {f}" for f in feedback])}
 
-Number of items: Please generate at least {num_items} items.
-The items should be written in {self.language}
+- The items should be written in {self.language}
+- Please generate at least {num_items} items. (You may modify existing items or create new ones based on the feedback.)
 
-Please output the refined items in JSON format.
+Please output the refined items list in JSON format.
 """
-
+            print("提示詞：", refine_prompt)
             response = ollama.chat(
                 model=self.model,
                 messages=[
@@ -121,7 +151,8 @@ Please output the refined items in JSON format.
                 options={
                     "temperature": config.temperature,
                     "num_predict": config.max_tokens
-                }
+                },
+                format=self.schema.model_json_schema()
             )
 
             content = response['message']['content']
