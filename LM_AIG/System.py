@@ -166,7 +166,7 @@ class LM_AIG_System:
 
         # 將結果儲存為文字檔
         filename = f"lm_aig_workflow_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        with open(filename, "w", encoding="utf-8") as f:
+        with open("AIG_results/"+filename, "w", encoding="utf-8") as f:
             f.write("LM-AIG 工作流程結果\n")
             f.write("="*40 + "\n\n")
             f.write("題目生成日期: " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n\n")

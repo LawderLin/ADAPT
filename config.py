@@ -8,13 +8,11 @@ class Config:
     """系統配置類別"""
     model_name: str = "qwen3:8b"  # 使用較小的模型
     temperature: float = 0.7
-    max_tokens: int = 1000
-    language: str = "繁體中文"
+    max_tokens: int = 1000 # 增加最大生成長度
+    language: str = "繁體中文" # 字串會傳進 prompt 中，所以直接敘述要使用的語言就好
 
     def select_model(self, model_name: str):
         """選擇使用的模型"""
-
-
         self.model_name = model_name
 
 config = Config()
