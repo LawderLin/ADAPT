@@ -18,12 +18,13 @@ class CriticAgent:
         self.bias_reviewer = BiasReviewer(self.model)
         self.meta_reviewer = MetaReviewer(self.model)
 
-    def review_items(self, items: List[str], construct: str = "") -> Dict[str, Any]:
+    def review_items(self, items: List[str], specification: str = "", construct: str = "") -> Dict[str, Any]:
         """
         全面評審測驗題目
 
         Args:
             items: 題目列表
+            specification: 題目規格說明
             construct: 心理建構名稱
 
         Returns:
@@ -38,7 +39,11 @@ class CriticAgent:
         }
 
         # 元評審員整合所有評審結果
-        meta_review = self.meta_reviewer.integrate_reviews(reviews, items)
+        meta_review = self.meta_reviewer.integrate_reviews(
+            reviews=reviews,
+            items=items,
+            specifications=specification,
+            )
 
         return {
             "individual_reviews": reviews,

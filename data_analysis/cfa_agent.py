@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import FactorAnalysis
 from sklearn.preprocessing import StandardScaler
-from LM_AIG.JSONFormatAgent import JSONFormatAgent
 
 from config import config
 
@@ -228,67 +227,77 @@ class CFAAgent:
         使用 LLM 根據理論背景和因素負荷量命名因素
         """
         if not name_with_llm:
-            print("選擇不使用 LLM 進行因素命名，使用默認命名")
             return {f"Factor_{i+1}": f"Factor_{i+1}" for i in range(n_factors)}
+        
         try:
             import ollama
         except ImportError:
-            print("⚠️  無 Ollama 客戶端，使用默認因素命名")
-            return {f"Factor_{i+1}": f"Unnamed_Factor_{i+1}" for i in range(n_factors)}
+            print("⚠️  無 Ollama 客戶端，使用預設因素命名")
+            return {f"Factor_{i+1}": f"Factor_{i+1}" for i in range(n_factors)}
         
-        # 準備 LLM 提示（簡化以降低 JSON 解析難度）
-        loadings_str = loadings.round(3).to_string()
+        # 提取各因素最高負荷量的項目
+        factor_descriptions = []
+        for idx, factor_col in enumerate(loadings.columns, 1):
+            # 找出負荷量最高的 3-5 個題目
+            top_k = min(5, len(loadings))
+            top_indices = loadings[factor_col].abs().nlargest(top_k).index
+            top_descriptions = []
+            for item_idx in top_indices:
+                loading = loadings.loc[item_idx, factor_col]
+                item_text = test_items[int(item_idx.split('_')[1]) - 1] if len(test_items) > 0 else f"{item_idx}"
+                top_descriptions.append(f"    - {item_text[:80]} (負荷量: {loading:.3f})")
+            
+            description = f"\nFactor_{idx} 的主要題目：\n" + "\n".join(top_descriptions)
+            factor_descriptions.append(description)
         
-        # 提取各因素最高負荷量的題目
-        top_items = []
-        for factor_col in loadings.columns:
-            top_item = loadings[factor_col].abs().idxmax()
-            top_loading = loadings.loc[top_item, factor_col]
-            top_items.append(f"  - {factor_col}: {top_item} (負荷量: {top_loading:.3f})")
-        
-        prompt = f"""以下是心理測驗的因素分析結果。
+        prompt = f"""你是心理測驗專家。根據以下理論背景和因素分析結果，請為每個因素命名。
 
 理論背景：
 {theoretical_background}
 
-題目：
-{chr(10).join(test_items)}
+因素分析結果：
+{''.join(factor_descriptions)}
 
-各因素的關鍵題目（最高負荷量）：
-{chr(10).join(top_items)}
+請依序為每個因素提供一個簡潔的中文名稱（2-6 字），直接輸出名稱列表。
+格式例如：
+多方思考
+整合性
+和諧性
 
-請為這些因素命名。以 JSON 格式返回結果，格式如下：
-- factor_id: 因素編號 (如 Factor_1)
-- factor_name: 因素名稱
+只輸出因素名稱，每個名稱占一行。
 """
+        
         factor_names = {}
         try:
             response = ollama.chat(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}],
-                options={"temperature": 0.3, "num_predict": 1000},
+                    {"role": "system", "content": "你是專業的心理測驗分析師，擅長根據題項內容和理論背景為潛在因素命名。"},
+                    {"role": "user", "content": prompt}
+                ],
+                options={"temperature": 0.3, "num_predict": 500},
                 think=False
             )
-            content = response['message']['content']
-
-            try:
-                content = JSONFormatAgent().format_to_json(content)['items']
-            except Exception as e:
-                print(f"⚠️  JSON 解析失敗: {e}")
-
-            # 解析 JSON 結果
-            for item in content:
-                factor_id = item.get('factor_id', '').strip()
-                factor_name = item.get('factor_name', '').strip()
-                if factor_id and factor_name:
-                    factor_names[factor_id] = factor_name
+            
+            content = response['message']['content'].strip()
+            
+            # 簡單解析：每行一個因素名稱
+            lines = [line.strip() for line in content.split('\n') if line.strip()]
+            names = [line for line in lines if line and len(line) <= 20 and not line.startswith('#')]
+            
+            # 映射因素名稱
+            for i in range(min(n_factors, len(names))):
+                factor_names[f"Factor_{i+1}"] = names[i]
         
         except Exception as e:
-            print(f"⚠️  LLM 命名失敗: {e}，使用默認命名")
+            print(f"⚠️  LLM 命名失敗: {e}，使用預設名稱")
         
-        return factor_names if factor_names else {f"Factor_{i+1}": f"Factor_{i+1}" for i in range(n_factors)}
+        # 補充缺失的因素
+        for i in range(n_factors):
+            if f"Factor_{i+1}" not in factor_names:
+                factor_names[f"Factor_{i+1}"] = f"Factor_{i+1}"
+        
+        return factor_names
     
     def _assess_factor_quality(self, cfa_results: Dict[str, Any]) -> Dict[str, Any]:
         """
