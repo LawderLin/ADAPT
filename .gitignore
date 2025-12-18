@@ -1,3 +1,4 @@
 .venv
 __pycache__/
 *.py[cod]
+lm_aig_workflow_results_*.txt
